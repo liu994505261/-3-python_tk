@@ -68,26 +68,27 @@ jobs:
         cp README.md release/
         
         # 创建运行脚本
-        cat > release/run.sh << 'EOF'
-#!/bin/bash
-cd "$(dirname "$0")"
-./fortune_app
-EOF
+        cat > release/run.sh <<'RUNEOF'
+        #!/bin/bash
+        cd "$(dirname "$0")"
+        ./fortune_app
+        RUNEOF
+        
         chmod +x release/run.sh
         chmod +x release/fortune_app
         
         # 创建桌面快捷方式
-        cat > release/fortune_app.desktop << 'EOF'
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=今日运势
-Comment=查看今日运势
-Exec=/path/to/fortune_app
-Icon=applications-games
-Terminal=false
-Categories=Game;
-EOF
+        cat > release/fortune_app.desktop <<'DESKTOPEOF'
+        [Desktop Entry]
+        Version=1.0
+        Type=Application
+        Name=今日运势
+        Comment=查看今日运势
+        Exec=/path/to/fortune_app
+        Icon=applications-games
+        Terminal=false
+        Categories=Game;
+        DESKTOPEOF
         
         # 打包
         cd release
