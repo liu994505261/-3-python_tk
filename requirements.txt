@@ -1,0 +1,5 @@
+# 今日运势应用依赖
+# Tkinter 是 Python 标准库的一部分，无需额外安装
+
+# 编译依赖（仅用于 PyInstaller 打包）
+pyinstaller>=6.0.0

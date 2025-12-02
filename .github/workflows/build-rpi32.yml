@@ -1,0 +1,122 @@
+name: Build Raspberry Pi 32-bit Binary
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build binary for Raspberry Pi 32-bit (armv7)
+      run: |
+        docker run --rm --privileged \
+          -v ${{ github.workspace }}:/workspace \
+          -w /workspace \
+          --platform linux/arm/v7 \
+          python:3.11-bullseye \
+          bash -c "
+            set -e
+            echo '=== 安装系统依赖 ==='
+            apt-get update
+            apt-get install -y \
+              gcc g++ make \
+              python3-tk \
+              libx11-6 libxext6 libxrender1 libxinerama1 libxi6 libxrandr2 libxcursor1 libxtst6 \
+              binutils \
+              upx-ucl
+            
+            echo '=== 安装 Python 依赖 ==='
+            pip install --upgrade pip
+            pip install pyinstaller
+            
+            echo '=== 使用 PyInstaller 编译 ==='
+            pyinstaller --onefile \
+              --name fortune_app \
+              --windowed \
+              --clean \
+              --strip \
+              fortune_app.py
+            
+            echo '=== 压缩二进制文件 ==='
+            upx --best --lzma dist/fortune_app || true
+            
+            echo '=== 编译完成 ==='
+            ls -lh dist/
+            file dist/fortune_app
+          "
+    
+    - name: Create release package
+      run: |
+        mkdir -p release
+        cp dist/fortune_app release/
+        cp README.md release/
+        
+        # 创建运行脚本
+        cat > release/run.sh << 'EOF'
+#!/bin/bash
+cd "$(dirname "$0")"
+./fortune_app
+EOF
+        chmod +x release/run.sh
+        chmod +x release/fortune_app
+        
+        # 创建桌面快捷方式
+        cat > release/fortune_app.desktop << 'EOF'
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=今日运势
+Comment=查看今日运势
+Exec=/path/to/fortune_app
+Icon=applications-games
+Terminal=false
+Categories=Game;
+EOF
+        
+        # 打包
+        cd release
+        tar -czf ../fortune_app_rpi32_armv7.tar.gz *
+        cd ..
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: fortune_app_rpi32_binary
+        path: fortune_app_rpi32_armv7.tar.gz
+        retention-days: 30
+    
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: fortune_app_rpi32_armv7.tar.gz
+        body: |
+          ## 树莓派 32 位二进制版本
+          
+          ### 安装说明
+          1. 下载 `fortune_app_rpi32_armv7.tar.gz`
+          2. 解压: `tar -xzf fortune_app_rpi32_armv7.tar.gz`
+          3. 运行: `./fortune_app` 或 `./run.sh`
+          
+          ### 系统要求
+          - 树莓派 (32位 ARMv7 系统)
+          - Raspberry Pi OS (Bullseye 或更新版本)
+          - 需要图形界面 (X11)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
